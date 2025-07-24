@@ -1,365 +1,144 @@
-🔸 JDBC là gì?
-JDBC là một API trong Java giúp kết nối và làm việc với cơ sở dữ liệu (ví dụ: MySQL, Oracle, SQL Server...).
-
-Nó cho phép Java:
-
-Kết nối đến database
-
-Gửi truy vấn SQL (SELECT, INSERT…)
-
-Nhận và xử lý kết quả trả về
-
-🔸 Các bước sử dụng JDBC cơ bản:
-
-    🔸Nạp driver JDBC
-
-Class.forName("com.mysql.cj.jdbc.Driver");
-
-    🔸Kết nối đến cơ sở dữ liệu
-
-Connection conn = DriverManager.getConnection(
-    "jdbc:mysql://localhost:3306/ten_database", "user", "password");
-
-    🔸Tạo đối tượng truy vấn
-
-Statement stmt = conn.createStatement();
-
-    🔸Gửi câu lệnh SQL và nhận kết quả
-
-ResultSet rs = stmt.executeQuery("SELECT * FROM students");
-
-    🔸Xử lý kết quả
-
-while (rs.next()) {
-    System.out.println(rs.getString("name"));
-}
-
-Đóng kết nối
-
-rs.close();
-stmt.close();
-conn.close();
-
-🔸 Một số class chính trong JDBC:
-Class	Vai trò
-DriverManager	Quản lý driver, tạo kết nối database
-Connection	Đại diện cho kết nối đến CSDL
-Statement	Thực hiện các câu lệnh SQL tĩnh
-PreparedStatement	Câu lệnh SQL có tham số, tránh SQL injection
-ResultSet	Chứa kết quả trả về từ SELECT
-
-🔸 Gợi ý cho người mới:
-Luôn đóng kết nối sau khi dùng.
-
-Ưu tiên dùng PreparedStatement thay cho Statement.
-
-Nếu dùng MySQL: thêm thư viện MySQL JDBC driver (file .jar) vào project.
-
-
-✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
-
-✅ Stored Procedure là gì?
-Stored Procedure (thủ tục lưu trữ) là một đoạn mã SQL được lưu sẵn trong cơ sở dữ liệu.
-Khi cần, bạn chỉ việc gọi tên thủ tục đó thay vì viết lại toàn bộ câu lệnh.
-
-📌 Nó giống như 1 "hàm" trong SQL.
-✅ Lợi ích:
-Dễ tái sử dụng.
-
-Giảm lỗi lặp lại code.
-
-Chạy nhanh hơn do đã được biên dịch.
-
-Giúp bảo mật logic xử lý (client không thấy chi tiết câu lệnh SQL).
-
-  ✅ Cách tạo thủ tục đơn giản (MySQL):
-
-        DELIMITER //
-        CREATE PROCEDURE getAllStudents()
-        BEGIN
-            SELECT * FROM students;
-        END //
-        DELIMITER ;
-
-Dòng	                        Ý nghĩa
-DELIMITER //	        Tạm thời dùng // thay vì ; để phân biệt
-END //	                Kết thúc thủ tục bằng //
-DELIMITER ;         	Đổi lại dấu ; như bình thường sau khi tạo xong
-
-
-
-✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
-
-✅ 1. JDBC là gì?
-JDBC là API trong Java dùng để kết nối và làm việc với cơ sở dữ liệu (SQL).
-
-✅ 2. Kiến trúc JDBC gồm 2 tầng chính:
-
-[Java Application]
-        ↓
-[JDBC API (java.sql)]
-        ↓
-[JDBC Driver]
-        ↓
-[Database (MySQL, Oracle, v.v.)]
-
-        ✅ Giải thích:
-Tầng	                     Vai trò
-Java Application	Chương trình Java của bạn
-JDBC API	         Cung cấp các interface để bạn thao tác với database
-JDBC Driver	         Là cầu nối giúp JDBC giao tiếp với CSDL cụ thể (MySQL, Oracle, v.v.)
-Database	         Hệ quản trị cơ sở dữ liệu
-
-
-✅ 3. Các thành phần chính trong JDBC API:
-Thành phần                      	Vai trò	Ví dụ
-DriverManager	    Quản lý driver và tạo kết nối	DriverManager.getConnection(...)
-Connection	        Đại diện cho kết nối với CSDL	Connection conn = ...
-Statement	        Thực thi câu SQL đơn giản	stmt.executeQuery("SELECT ...")
-PreparedStatement	Thực thi câu SQL có tham số	pst.setString(1, "An");
-ResultSet	        Lưu kết quả truy vấn SELECT	rs.next(), rs.getString(...)
-SQLException	    Bắt lỗi khi thao tác DB	try { ... } catch(SQLException e) {...}
-
-✅ 4. 4 bước chính khi dùng JDBC:
-Nạp driver
-    Class.forName("com.mysql.cj.jdbc.Driver");
-
-Tạo kết nối
-    Connection conn = DriverManager.getConnection(...);
-
-Tạo lệnh và thực thi SQL
-    Statement stmt = conn.createStatement();
-    ResultSet rs = stmt.executeQuery("SELECT * FROM ...");
-
-Xử lý kết quả và đóng kết nối
-    while (rs.next()) {...}
-    conn.close();
-
-✅ Tóm tắt nhanh:
-    JDBC gồm:
-
-    API để gọi trong Java
-
-    Driver để kết nối tới CSDL cụ thể
-
-    Các lớp chính: Connection, Statement, ResultSet...
-
-    Là cầu nối giữa Java và CSDL như MySQL, Oracle...
-
-
-
-
-    🔹 1. Statement
-Dùng để thực thi các câu SQL tĩnh, không có tham số (hoặc có nhưng phải nối chuỗi).
-
-Không bảo vệ được trước SQL Injection.
-
-Hiệu suất kém hơn so với PreparedStatement vì không được biên dịch trước.
-
-Ví dụ:
-
-Statement stmt = conn.createStatement();
-ResultSet rs = stmt.executeQuery("SELECT * FROM users WHERE age > 20");
-🔹 2. PreparedStatement ✅ (Phổ biến nhất)
-Dùng cho các truy vấn có tham số, ví dụ: ? trong câu SQL.
-
-Bảo mật hơn, tránh được SQL Injection.
-
-Tối ưu hiệu năng vì câu lệnh được biên dịch sẵn và có thể tái sử dụng.
-
-Ví dụ:
-
-PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE age > ?");
-pstmt.setInt(1, 20);
-ResultSet rs = pstmt.executeQuery();
-🔹 3. CallableStatement
-Dùng để gọi các stored procedures trong CSDL (thủ tục lưu trữ).
-
-Hỗ trợ tham số vào, ra, và vào-ra.
-
-Dùng khi logic phức tạp được xử lý trong database qua các procedure.
-
-Ví dụ:
-
-CallableStatement cstmt = conn.prepareCall("{call get_user_count(?)}");
-cstmt.registerOutParameter(1, Types.INTEGER);
-cstmt.execute();
-int count = cstmt.getInt(1);
-
-
-✅ 1. CallableStatement là gì?
-CallableStatement là một giao diện trong JDBC dùng để gọi thủ tục lưu trữ (stored procedure) trong database.
-
-✅ Dùng khi logic nghiệp vụ (business logic) được viết sẵn trong database (thường thấy trong hệ thống lớn, hoặc nơi dùng Oracle, MySQL, SQL Server, v.v.).
-
-✅ 3. Cú pháp gọi thủ tục với CallableStatement
-
-USE `ecommerce`;
-DELIMITER //
-CREATE PROCEDURE getInsert(product_id char(5), name varchar(100), price float)
-BEGIN
-    INSERT into `products` (`product_id`, `name`, `price`)
-        VALUES (`product_id`,`name`,`price`);
-END //
-DELIMITER ;
-
-
-#Trong Main
-     String SQL = "{CALL getInsert(?,?,?)}";
-
-        Connection cnn = ConnectionDB.getConnection();
-
+ORM là gì?
+ORM (Object-Relational Mapping) là một kỹ thuật lập trình giúp ánh xạ (mapping) giữa các đối tượng trong ngôn ngữ lập trình hướng đối tượng (như Java) với các bảng trong cơ sở dữ liệu quan hệ (RDBMS)
+ORM cho phép lập trình viên thao tác với cơ sở dữ liệu thông qua các đối tượng mà không cần viết trực tiếp các câu lệnh SQL
+
+Cách ORM hoạt động
+Mỗi class Java tương ứng với một table trong cơ sở dữ liệu
+Mỗi instance (đối tượng) tương ứng với một record (hàng dữ liệu)
+Các field trong class tương ứng với các column trong bảng
+ORM sẽ tự động chuyển đổi dữ liệu giữa Object và dữ liệu trong database (mapping dữ liệu)
+
+Các ORM Framework phổ biến trong Java
+Hibernate : 	
+Phổ biến nhất, hỗ trợ HQL (Hibernate Query Language), caching mạnh
+
+JPA (Java Persistence API): 
+Chuẩn Java cho ORM, thường dùng với Hibernate làm hiện thực
+
+Spring Data JPA: 	
+Dựa trên JPA, tích hợp sẵn với Spring Boot
+
+    Ví dụ đơn giản với Hibernate (Annotation-based)
+
+@Entity
+@Table(name = "Users")
+    public class User {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+            private Long id;
+
+        @Column(name ="username")
+            private String username;
+
+        @Colum(name = "email")
+            private String email;
+
+        //getters, setters
+
+    }
+
+Annotation @Entity xác định đây là Entity class
+@Table ánh xạ với bảng users
+@Id xác định khóa chính
+ORM sẽ tự động ánh xạ các field sang column tương ứng
+ 
+
+Hibernate là gì?
+Hibernate là một framework mã nguồn mở của Java, giúp thực hiện ORM (Object-Relational Mapping)
+Hibernate đóng vai trò là tầng trung gian giữa ứng dụng Java và cơ sở dữ liệu, tự động ánh xạ (mapping) giữa các đối tượng Java (POJO) và bảng trong CSDL
+Hibernate quản lý CRUD, ánh xạ quan hệ, lazy loading, cache, transaction, query HQL…
+ 
+
+Ưu điểm của Hibernate
+Không cần viết SQL thủ công cho CRUD
+Hỗ trợ HQL (Hibernate Query Language) – Ngôn ngữ truy vấn hướng đối tượng
+Tự động quản lý cache, lazy loading
+Dễ dàng tích hợp với Spring Framework
+Hỗ trợ nhiều loại cơ sở dữ liệu thông qua cấu hình
+ 
+
+Các khái niệm chính trong Hibernate
+    SessionFactory: Đối tượng khởi tạo session (kết nối), được tạo 1 lần
+    Session: 	Đối tượng làm việc trực tiếp với DB (open/close), giống DAO
+    Transaction: Quản lý giao dịch
+    Entity: Lớp ánh xạ với bảng trong DB
+
+@Entity
+@Table(name = "category")
+public class Category implements Serializable { //seriali giúp đồng bộ khi hoạt động trên internet
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int category_id;
+    private String category_name;
+    private String category_ds;
+    private Boolean category_status;
+
+    //getter, setter
+
+
+
+public class HibernateUtils {
+    private static final SessionFactory sessionFactory = buildSessionFactory();
+
+    private static SessionFactory buildSessionFactory() {
         try {
-            CallableStatement cst = cnn.prepareCall(SQL);
-            cst.setString(1, "Nam");
-            cst.setString(2, "Hoang");
-            cst.setFloat(3, 3000);
-            int rowsInsert = cst.executeUpdate();
-            System.out.println(rowsInsert);
+            Properties prop = new Properties(); //tạo 1 obj chứa thông tin cấ hình hibernate thay file XML
+            prop.put(Environment.DIALECT, "org.hibernate.dialect.MySQL8Dialect");
+            prop.put(Environment.DRIVER, "com.mysql.cj.jdbc.Driver");
+            prop.put(Environment.URL, "jdbc:mysql://localhost:3306/categorymanagement_db");
+            prop.put(Environment.USER, "root");
+            prop.put(Environment.PASS, "Weak");
+            prop.put(Environment.SHOW_SQL, "true");
+            prop.put(Environment.HBM2DDL_AUTO, "update");
+
+            // ServiceRegistry là đối tượng trung gian giúp Hibernate tạo SessionFactory từ cấu hình.
+            ServiceRegistry registry = new StandardServiceRegistryBuilder()
+                    .applySettings(prop)
+                    .build();
+            //tạo Sessionfactory
+            return new Configuration() //khởi tạo
+                    .addProperties(prop) //thêm cấu hình vào
+                    .addAnnotatedClass(Category.class) //đăng ký entity class Category có @Entity
+                    .buildSessionFactory(registry); // tạo SessionFactory
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
+    }
 
-
-Điều kiện phải có class connectionDB
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-
-public class ConnectionDB {
-    public static Connection getConnection() {
-        try {
-            // Load driver (nếu JDBC 4.0+ thì dòng này có thể không cần)
-            Class.forName("com.mysql.cj.jdbc.Driver");
-
-            return DriverManager.getConnection(
-                    "jdbc:mysql://localhost:3306/ecommerce", // ⚠️ đổi tên DB thật
-                    "root",                                      // ⚠️ đổi user thật
-                    "Weak"                              // ⚠️ đổi mật khẩu thật
-            );
-        } catch (ClassNotFoundException | SQLException e) {
-            throw new RuntimeException("❌ Lỗi kết nối DB: " + e.getMessage(), e);
-        }
+    public static SessionFactory getSessionFactory() {
+        return sessionFactory;
     }
 }
 
 
-✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
-
-✅ I. Tổng quan về Transaction trong JDBC
-📌 Transaction là gì?
-Là tập hợp các thao tác SQL được thực hiện như một khối duy nhất.
-Nếu một thao tác thất bại → toàn bộ khối bị hủy bỏ.
-
-✅ "Tất cả hoặc không gì cả" — nguyên tắc của transaction.
-
-📌 4 tính chất cơ bản của Transaction (ACID):
-Tính chất                       	Giải thích
-Atomicity	    Tính nguyên tử: tất cả phải thành công hoặc không gì cả
-Consistency         	Dữ liệu luôn đúng trạng thái
-Isolation       	Giao dịch không ảnh hưởng nhau
-Durability	    Sau khi commit, dữ liệu được lưu vĩnh viễn
 
 
-✅ II. JDBC mặc định tự động commit
-Khi bạn dùng:
+public class HibernateTest {
+    public static void main(String[] args) {
+        try{
+            Session session = HibernateUtils.getSessionFactory().openSession();
 
-Connection conn = DriverManager.getConnection(...);
-// mặc định: conn.setAutoCommit(true);
+         //update
+            Category c = session.get(Category.class, 13); // persisten
+            c.setCategory_ds("Du lieu cap nhat");
+        // bật giao tác để tránh tranh chấp dữ liệu
+            Transaction tx = session.beginTransaction();
+            session.save(c); // thực hiện lệh cập nhật
+            tx.commit();
+            
+            
+           // creat - không cần tạo giao tác vì k có ai tranh chấp dữ liệu
+            Category category = new Category();  --transient
+            category.setCategory_name("Iphone");
+            category.setCategory_ds("Dien Thoai DI Dong Thong Minh");
+            category.setCategory_ds("telephone");
+            session.save(category);
 
-→ Mỗi executeUpdate() sẽ tự commit ngay sau khi chạy.
+            session.close();
 
-✅ III. Quản lý transaction thủ công trong JDBC
-📌 Các bước:
-
-    conn.setAutoCommit(false);     // 1. Tắt auto commit
-    // Thực hiện nhiều thao tác SQL
-    conn.commit();                 // 2. Nếu thành công → commit
-    conn.rollback();               // 3. Nếu lỗi → rollback (hủy toàn bộ)
-
-
-✅ IV. Ví dụ đơn giản: Chuyển tiền giữa 2 tài khoản
-
-
-public void transferMoney(int fromAcc, int toAcc, double amount) {
-    Connection conn = ConnectionDb.getConnection();
-
-    try {
-        conn.setAutoCommit(false);  // 🔴 Bắt đầu transaction
-
-        // Trừ tiền người gửi
-        PreparedStatement ps1 = conn.prepareStatement(
-            "UPDATE Account SET balance = balance - ? WHERE id = ?");
-        ps1.setDouble(1, 1000);
-        ps1.setInt(2, 1);
-        ps1.executeUpdate();
-
-        // Cộng tiền người nhận
-        PreparedStatement ps2 = conn.prepareStatement(
-            "UPDATE Account SET balance = balance + ? WHERE id = ?");
-        ps2.setDouble(1, 1000);
-        ps2.setInt(2, 2);
-        ps2.executeUpdate();
-
-        conn.commit();  // ✅ Tất cả OK → lưu vào DB
-        System.out.println("💰 Giao dịch thành công!");
-
-    } catch (Exception e) {
-        try {
-            conn.rollback();  // ❌ Có lỗi → huỷ toàn bộ
-            System.out.println("❌ Giao dịch thất bại, đã rollback.");
-        } catch (SQLException ex) {
-            ex.printStackTrace();
+        }catch(Exception e){
+            throw new RuntimeException(e);
         }
     }
 }
 
-
-✅ V. Tổng kết
-Giai đoạn	                 Câu lệnh JDBC
-Tắt auto commit	        conn.setAutoCommit(false);
-Commit	             conn.commit();
-Rollback	        conn.rollback();
-
-🧠 Chỉ cần nhớ: Tắt auto-commit → Commit hoặc Rollback theo kết quả.
-
-✅ Các thao tác chính với Transaction trong JDBC
-Thao tác	                        Mục đích
-setAutoCommit(false)	Bắt đầu một transaction thủ công (JDBC mặc định là true – auto commit)
-commit()	            Xác nhận và lưu tất cả thay đổi vào database
-rollback()	            Hủy toàn bộ thay đổi từ đầu transaction đến hiện tại nếu có lỗi
-setSavepoint()	        Đánh dấu một vị trí checkpoint trong transaction
-rollback(savepoint)	    Quay về vị trí đã đánh dấu (không rollback toàn bộ)
-releaseSavepoint()	    Giải phóng savepoint không dùng nữa
-
-✅ Ví dụ minh họa đầy đủ các thao tác
-
-    Connection conn = ConnectionDb.getConnection();
-try {
-    conn.setAutoCommit(false); // 1. Bắt đầu transaction
-
-    Statement st = conn.createStatement();
-
-    st.executeUpdate("UPDATE Account SET balance = balance - 500 WHERE id = 1");
-    Savepoint sp1 = conn.setSavepoint("AfterFirstUpdate"); // 2. Đặt checkpoint
-
-    st.executeUpdate("UPDATE Account SET balance = balance + 500 WHERE id = 2");
-
-    // Lỗi giả định
-    // int error = 1 / 0;
-
-    conn.commit(); // 3. Nếu không lỗi → commit toàn bộ
-    System.out.println("💰 Giao dịch thành công!");
-
-} catch (Exception e) {
-    try {
-        conn.rollback(); // 4. Nếu lỗi → rollback toàn bộ
-        // Hoặc: conn.rollback(sp1); // rollback về checkpoint (nếu cần)
-        System.out.println("❌ Đã rollback giao dịch.");
-    } catch (SQLException ex) {
-        ex.printStackTrace();
-    }
-} finally {
-    conn.setAutoCommit(true); // 5. Luôn reset lại autoCommit
-}
