@@ -142,3 +142,339 @@ public class HibernateTest {
     }
 }
 
+
+
+
+🔄 Transaction là gì?
+Transaction (giao dịch) là một đơn vị công việc logic bao gồm một hoặc nhiều thao tác (insert, update, delete...) được thực hiện như một khối nguyên tử (atomic). Tức là:
+
+Thành công → commit toàn bộ
+Lỗi ở giữa → rollback toàn bộ
+
+SELECT (chỉ đọc dữ liệu)	    ❌ Không cần	Không thay đổi DB, không lo xung đột
+INSERT, UPDATE, DELETE	        ✅ Cần	Có thể thay đổi dữ liệu, cần đảm bảo toàn vẹn
+Nhiều thao tác liên quan nhau	✅ Cần	Đảm bảo atomic — tất cả hoặc không gì cả
+Gọi stored procedure có logic thay đổi dữ liệu	✅ Cần	Vì procedure có thể update nhiều bảng
+🔥 Khi nào bắt buộc phải dùng Transaction?
+    @Transactional
+    public void transferMoney(Long fromId, Long toId, double amount) {
+        Account from = accountRepo.findById(fromId).get();
+        Account to = accountRepo.findById(toId).get();
+        
+        from.setBalance(from.getBalance() - amount);
+        to.setBalance(to.getBalance() + amount);
+        
+        accountRepo.save(from);
+        accountRepo.save(to);
+    }
+Nếu không có @Transactional, lỗi giữa chừng (VD: mất kết nối) sẽ khiến tài khoản bị lệch, tiền mất tích 🧨
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+
+Entity Relationship : @ManyToOne, @ManyToMany, @OneToMany, @OneToOne
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+
+🔹 @ManyToOne
+Nhiều bản ghi ở bảng này liên kết tới 1 bản ghi ở bảng khác.
+
+Ví dụ:
+    @ManyToOne
+    @JoinColumn(name = "department_id")
+    private Department department;
+
+📌 Ý nghĩa:
+    Nhiều nhân viên thuộc 1 phòng ban → Employee là Many, Department là One.
+    Tạo khóa ngoại department_id trong bảng employee.
+
+
+🔹 @OneToMany
+Một bản ghi ở bảng này liên kết đến nhiều bản ghi ở bảng khác.
+    Ví dụ
+        @OneToMany(mappedBy = "department")
+    private List<Employee> employees;
+
+📌 Ý nghĩa:
+    Một phòng ban có nhiều nhân viên.
+    Quan hệ ngược với @ManyToOne, thường dùng mappedBy để không tạo thêm bảng trung gian.
+    ✅ Nên dùng kết hợp với @ManyToOne phía còn lại.
+
+🔹 @OneToOne
+1 bản ghi tương ứng đúng 1 bản ghi khác.
+
+Ví dụ:
+    @OneToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
+📌 Ý nghĩa:
+    Mỗi User có 1 Profile, mỗi Profile thuộc 1 User.
+    Tạo khóa ngoại user_id ở bảng profile.
+
+
+🔹@ManyToMany
+Nhiều bản ghi ở bảng này liên kết với nhiều bản ghi ở bảng kia.
+    Ví dụ:
+    @ManyToMany
+    @JoinTable( → Chỉ định tên bảng trung gian và các cột khóa ngoại.
+        name = "student_course",    → Tên bảng trung gian trong database
+        joinColumns = @JoinColumn(name = "student_id"),→ Cột student_id trong bảng trung gian dùng để liên kết với Student (chính là class hiện tại).
+        inverseJoinColumns = @JoinColumn(name = "course_id") → Cột course_id trong bảng trung gian dùng để liên kết với Course (class bên kia).
+    )
+    private List<Course> courses;
+
+📌 Ý nghĩa:
+    Một sinh viên học nhiều môn, và một môn có nhiều sinh viên.
+    Tạo bảng trung gian student_course để lưu quan hệ nhiều-nhiều.
+
+🧠 Tổng kết bảng so sánh
+Annotation	    Ý nghĩa	             Ví dụ	                 Ghi nhớ
+@ManyToOne	Nhiều → Một	    Nhiều Employee → 1 Dept 	    Tạo FK
+@OneToMany	Một → Nhiều 	1 Dept → nhiều Employee	Dùng    mappedBy
+@OneToOne	Một ↔ Một	    User ↔ Profile	Dùng             @JoinColumn
+@ManyToMany	Nhiều ↔ Nhiều	Student ↔ Course	        Dùng bảng trung gian
+
+
+✅ Cách nhớ ngắn gọn:
+Quan hệ	Vai trò	Cách nhớ nhanh
+@ManyToOne--	Bên nhiều---	Giữ khóa ngoại (@JoinColumn)
+@OneToMany--	Bên một---	Dùng mappedBy ánh xạ ngược
+
+
+
+BÀI TẬP 1 @Transactional
+
+✅ Ví dụ cụ thể:    
+    @Service
+    public class StudentService {
+
+        @Autowired
+        private StudentRepository studentRepository;
+
+        @Transactional
+        public void updateStudent(Student student) {
+            studentRepository.update(student);
+            
+            // Nếu không có lỗi → commit
+            // Nếu có lỗi ở đây → rollback toàn bộ
+            // int x = 1 / 0; // gây lỗi test rollback
+        }
+    }
+
+🧠 Bạn KHÔNG cần viết thủ công như Hibernate thuần:
+    // Hibernate thuần — cần làm thủ công
+    Session session = sessionFactory.openSession();
+    Transaction tx = session.beginTransaction();
+
+    try {
+        // thực hiện thao tác
+        tx.commit();
+    } catch (Exception e) {
+        tx.rollback();
+    }
+✅ Tóm lại:
+👉 Chỉ cần @Transactional, bạn được xử lý đầy đủ transaction — không cần code thủ công beginTransaction(), commit(), rollback() nữa
+
+
+
+🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠
+
+ViewResolver → ánh xạ view: ✅
+
+DataSource → driver, url, user/pass: ✅
+
+Properties → cấu hình hibernate: ✅
+
+SessionFactory → add properties, scan package có @Entity: ✅
+
+TransactionManager → quản lý giao dịch: ✅
+
+🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠🧠
+
+
+✅ 1. Cascade là gì?
+Cascade dùng để chỉ định các thao tác tự động lan sang entity liên quan.
+
+Ví dụ: Khi bạn lưu, xoá, hay merge một entity cha, thì các entity con liên quan có được thực hiện thao tác tương ứng không?
+
+💡 Ví dụ dễ hiểu:
+
+@OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
+private List<Product> products;
+    👉 Khi bạn save(Category) → JPA sẽ tự động save tất cả Product trong danh sách đó mà bạn không cần gọi riêng từng cái.
+
+🎯 Các loại CascadeType:
+CascadeType	    Ý nghĩa
+ALL     	Gồm tất cả các hành động bên dưới
+PERSIST	    Khi gọi persist() entity cha thì persist luôn entity con
+MERGE	    Khi gọi merge() thì merge luôn các entity con
+REMOVE	    Khi xoá entity cha thì tự động xoá entity con
+REFRESH	    Khi gọi refresh() thì cập nhật lại entity con
+DETACH	    Khi gọi detach() thì tách luôn entity con khỏi persistence context
+
+
+🛠️ Ví dụ về Cascade:
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.PERSIST)
+    private List<Invoince> invoices;
+
+  👉  Khi bạn lưu một Customer có invoices, Hibernate sẽ tự động lưu Invoice vào database
+ 
+
+✅ 2. FetchType là gì?
+FetchType dùng để chỉ định cách JPA tải dữ liệu quan hệ khi truy vấn.
+
+🎯 Có 2 loại chính:
+    FetchType	    Ý nghĩa
+    EAGER	    Tải ngay lập tức quan hệ khi truy vấn entity cha
+    LAZY	    Chỉ tải khi cần (truy cập đến mới truy vấn
+
+💡 Ví dụ:
+    @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
+    private List<Product> products;
+
+Khi bạn gọi Category c = session.get(Category.class, 1);
+→ Danh sách products sẽ chưa được tải cho đến khi bạn gọi c.getProducts().
+
+
+⚠️ Lưu ý khi dùng LAZY:
+Nếu dùng LAZY nhưng session đã đóng rồi, và bạn gọi getProducts() → lỗi:
+    LazyInitializationException
+
+    Cách xử lý:
+Dùng DTO để map khi session còn mở
+Dùng fetch join trong JPQL/HQL
+
+
+✅ Gợi ý cấu hình chuẩn cho thực tế:
+    ManyToOne: thường là EAGER (default)
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    OneToMany: thường nên là LAZY để tránh nặng
+
+    @OneToMany(mappedBy = "category", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<Product> products;
+
+
+
+
+
+🧨 Vấn đề: N + 1 Query
+Khi bạn thực hiện truy vấn như sau:
+
+    List<Customer> customers = customerRepository.findAll(); // Truy vấn 1
+
+    for (Customer customer : customers) {
+        List<Invoice> invoices = customer.getInvoices(); // Truy vấn N lần (mỗi customer một truy vấn)
+    }
+
+
+
+👉 Tổng số truy vấn SQL: 1 + N
+    Nếu có 1000 khách hàng → 1 + 1000 = 1001 truy vấn
+    ❌ Ứng dụng rất chậm, tốn tài nguyên
+
+✅ Giải pháp: Tránh N + 1 Query bằng Join Fetch
+✅ 1. Dùng @Query với JOIN FETCH trong repository
+
+@Query("SELECT c FROM Customer c LEFT JOIN FETCH c.invoices")
+List<Customer> findAllWithInvoices();
+
+Hibernate chỉ thực hiện 1 truy vấn duy nhất:
+SELECT c.*, i.* 
+FROM customer c
+LEFT JOIN invoice i ON i.customer_id = c.id
+
+⚠️ Với quan hệ OneToMany thì kết quả sẽ bị "nhân bản" khách hàng nếu có nhiều hoá đơn → dùng Set hoặc DISTINCT để xử lý.
+
+
+✅ 2. Dùng EntityGraph (nếu bạn không muốn viết JPQL)
+
+@EntityGraph(attributePaths = "invoices")
+@Query("SELECT c FROM Customer c")
+List<Customer> findAllWithInvoices();
+
+Cách này sử dụng annotation để khai báo quan hệ cần fetch, không cần viết JOIN.
+
+
+✅ 3. Sử dụng DTO để custom query (truy vấn dạng kết hợp)
+
+    @Query("SELECT new com.example.dto.CustomerInvoiceDTO(c.name, i.totalAmount) " +
+       "FROM Customer c LEFT JOIN c.invoices i")
+    ist<CustomerInvoiceDTO> findCustomerInvoiceInfo();
+
+ Cách này truy vấn đúng dữ liệu cần, nhẹ hơn rất nhiều vì không phải load cả object.
+
+
+
+✅ 3. Kết hợp Cascade và Fetching - Một ví dụ thực tế
+Một Khách hàng (Customer) có nhiều Hóa đơn (Invoice)
+Khi lưu khách hàng mới, cũng muốn lưu luôn hóa đơn liên quan
+Khi lấy thông tin khách hàng, chỉ cần lấy danh sách hóa đơn khi cần
+
+VÍ DỤ: 
+🔹   Cascade → để lưu khách hàng và hóa đơn cùng lúc
+🔹   FetchType.LAZY → để chỉ tải danh sách hóa đơn khi thật sự cần
+🔹"Customer có nhiều Invoice" → quan hệ @OneToMany
+
+
+    ✅ 1. Cấu trúc Entity: Customer và Invoice
+
+🔹 Customer.java
+        @Entity
+        @Table(name = "customer")
+        public class Customer {
+            @Id
+            @GeneratedValue(strategy = GenerationType.IDENTITY)
+            private Long id;
+
+            private String name;
+
+            // Một khách hàng có nhiều hóa đơn
+            @OneToMany(mappedBy = "customer", 
+                    cascade = CascadeType.PERSIST, 
+                    fetch = FetchType.LAZY)
+            private List<Invoice> invoices;
+
+            // Getter, Setter, Constructor
+        }
+
+
+🔹 Invoice.java
+        @Entity
+        @Table(name = "invoice")
+        public class Invoice {
+
+            @Id
+            @GeneratedValue(strategy = GenerationType.IDENTITY)
+            private Long id;
+
+            private Double amount;
+
+            @ManyToOne(fetch = FetchType.LAZY)
+            @JoinColumn(name = "customer_id")
+            private Customer customer;
+
+            // Getter, Setter, Constructor
+        }
+
+
+✅ 2. Lưu một Customer cùng với danh sách hóa đơn
+
+        Customer customer = new Customer();
+        customer.setName("Nguyễn Văn A");
+
+        Invoice invoice1 = new Invoice();
+        invoice1.setAmount(1000.0);
+        invoice1.setCustomer(customer); // phải gắn ngược lại
+
+        Invoice invoice2 = new Invoice();
+        invoice2.setAmount(2000.0);
+        invoice2.setCustomer(customer); // gắn ngược lại
+
+        customer.setInvoices(List.of(invoice1, invoice2));
+
+        customerRepository.save(customer); // ✅ Cascade sẽ lưu luôn invoice1 và invoice2
