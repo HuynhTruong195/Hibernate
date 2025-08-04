@@ -478,3 +478,601 @@ VÍ DỤ:
         customer.setInvoices(List.of(invoice1, invoice2));
 
         customerRepository.save(customer); // ✅ Cascade sẽ lưu luôn invoice1 và invoice2
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+Phân trang trong Hibernate 
+
+Nguyên lý Phân trang trong Hibernate
+ hỗ trợ phân trang thông qua hai phương thức chính trên đối tượng Query hoặc TypedQuery:
+
+ setFirstResult(int): Xác định vị trí bản ghi bắt đầu lấy kết quả (OFFSET)
+ setMaxResults(int): Giới hạn số bản ghi tối đa cần lấy (LIMIT)
+
+ LIMIT VS OFFSET DÙNG TRONG SQL NHƯNG HQL KHÔNG HỖ TRỢ NÊN PHẢI DÙNG setFirstResult VS  setMaxResults
+
+ ✅ Cách phân trang bằng Hibernate thuần (Session + Query)
+ 📌 Ví dụ:
+        Session session = sessionFactory.openSession();
+
+        Query<Customer> query = session.createQuery("FROM Customer", Customer.class);
+
+        // Thiết lập phân trang: lấy 10 bản ghi, bắt đầu từ bản ghi thứ 0
+        query.setFirstResult(0); // OFFSET = (pageNumber - 1) * pageSize
+        query.setMaxResults(10); // LIMIT Số lượng bản ghi muốn lấy
+
+        List<Customer> customers = query.getResultList();
+
+Kết quả: Lấy 10 khách hàng đầu tiên.
+
+✅ 4. Áp dụng cho phân trang nhiều trang:
+Giả sử:
+
+Trang 1: offset = 0
+
+Trang 2: offset = 10
+
+Trang 3: offset = 20
+(với pageSize = 10)
+
+        int pageNumber = 2;
+        int pageSize = 10;
+
+        Query<Customer> query = session.createQuery("FROM Customer", Customer.class);
+        query.setFirstResult((pageNumber - 1) * pageSize);
+        query.setMaxResults(pageSize);
+
+✅ 5. Nếu dùng Spring Data JPA thì dễ hơn nhiều
+
+    Pageable pageable = PageRequest.of(pageNumber, pageSize);
+    Page<Customer> page = customerRepository.findAll(pageable);
+
+    List<Customer> customers = page.getContent();
+    int totalPages = page.getTotalPages();
+    long totalElements = page.getTotalElements();
+
+THỰC TẾ THÌ CÁCH NÀY ĐƯỢC DÙNG PHỔ BIẾN NHẤT (Spring Data JPA)
+    ✅ 1. Dùng phân trang trong Spring Data JPA
+    👉 Bước 1: Viết Repository
+        public interface CustomerRepository extends JpaRepository<Customer, Long> {
+        // tự có sẵn phương thức: findAll(Pageable pageable)
+    }
+
+    👉 Bước 2: Gọi trong service hoặc controller
+    @GetMapping("/customers")
+    public String listCustomers(@RequestParam(defaultValue = "0") int page,
+                                @RequestParam(defaultValue = "10") int size,
+                                Model model) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Customer> customerPage = customerRepository.findAll(pageable);
+
+        model.addAttribute("customers", customerPage.getContent()); // danh sách khách hàng
+        model.addAttribute("currentPage", page);
+        model.addAttribute("totalPages", customerPage.getTotalPages());
+        return "list-customer";
+    }
+
+
+    ✅ 2. Tham số truy vấn (@RequestParam) sẽ đến từ giao diện:
+    #html
+    <!-- Giao diện phân trang -->
+    <a href="/customers?page=0&size=10">Trang 1</a>
+    <a href="/customers?page=1&size=10">Trang 2</a>
+    ...
+
+    👉 Tham số từ giao diện (page, size) sẽ trở thành query parameter, và Spring sẽ truyền vào controller thông qua @RequestParam.
+
+ ❗Mặc dù JpaRepository giúp bạn code cực kỳ nhanh và ngắn gọn, nó không đảm bảo hiệu suất tối ưu nếu bạn dùng “mặc định” không kiểm soát.   
+
+ ✅ Vậy muốn tối ưu hiệu suất thì cần làm gì?
+Tối ưu gì                                   Cách thực hiện
+✅ Giới hạn dữ liệu	                Dùng findAll(Pageable) thay vì findAll()
+✅ Tải có chọn lọc (selective loading)	Dùng @EntityGraph, JOIN FETCH, hoặc DTO
+✅ Giảm số lượng query	    Tránh N+1 bằng JOIN FETCH hoặc fetch batch
+✅ Dùng DTO thay vì trả về Entity	    Chỉ lấy field cần thiết → tránh tải dư
+✅ Truy vấn tùy chỉnh	    Dùng @Query, native SQL khi cần hiệu suất cao
+✅ Caching              	Dùng @Cacheable, Redis, hoặc L2 cache (ehcache...)
+✅ Tối ưu transaction scope	    Chỉ mở transaction ở service, không kéo dài
+.
+
+
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+Tối ưu truy vấn trong Hibernate
+
+✅ 1. Dùng Fetch Type hợp lý (LAZY vs EAGER)
+    ⚠️ Vấn đề:
+    Mặc định @ManyToOne là EAGER — dễ gây ra N+1 query hoặc tải dữ liệu không cần thiết.
+
+    ✅ Giải pháp:
+    Sử dụng FetchType.LAZY ở các mối quan hệ:
+        @ManyToOne(fetch = FetchType.LAZY)
+        private Category category;
+    Chỉ truy cập khi cần, tránh auto-load liên kết.
+
+✅ 2. Dùng Fetch Join thay vì lazy load thủ công
+    ⚠️ Vấn đề:
+    Lazy load = nhiều query → chậm
+
+    ✅ Giải pháp:
+    Sử dụng JOIN FETCH để lấy luôn dữ liệu liên quan chỉ bằng 1 query:
+        @Query("SELECT p FROM Product p JOIN FETCH p.category")
+        List<Product> findAllWithCategory();
+
+
+✅ 3. Dùng DTO projection thay vì entity
+    ⚠️ Vấn đề:
+    SELECT * → load toàn bộ entity (kể cả trường không dùng)
+
+    ✅ Giải pháp:
+    Truy vấn chỉ lấy các trường cần thiết → DTO projection:
+        @Query("SELECT new com.example.dto.ProductDTO(p.id, p.name) FROM Product p")
+        List<ProductDTO> getAllProductNames();
+→ Nhanh hơn nhiều so với load cả entity
+
+
+✅ 4. Dùng pagination (setFirstResult, setMaxResults)
+⚠️ Vấn đề:
+Truy vấn toàn bộ bảng có thể gây OOM hoặc chậm
+
+✅ Giải pháp:
+Áp dụng phân trang:
+
+    TypedQuery<Product> query = em.createQuery("FROM Product", Product.class);
+    query.setFirstResult(0);
+    query.setMaxResults(20);
+
+Trong Spring Data JPA:
+
+    Page<Product> findByStatus(String status, Pageable pageable);
+
+
+✅ 5. Bật batch_size và dùng batch insert/update
+    ⚠️ Vấn đề:
+    Hibernate mặc định gửi từng câu SQL một → chậm!
+
+    ✅ Giải pháp:
+
+    hibernate.jdbc.batch_size=30
+    hibernate.order_inserts=true
+    hibernate.order_updates=true
+
+  Sau đó:  
+
+    for (int i = 0; i < list.size(); i++) {
+        em.persist(list.get(i));
+        if (i % 30 == 0) {
+            em.flush();
+            em.clear();
+        }
+    }
+
+
+✅ 6. Tránh N+1 bằng EntityGraph (Spring JPA)
+
+    @EntityGraph(attributePaths = "category")
+    List<Product> findAll();
+
+
+✅ 7. Index hợp lý ở DB
+Hibernate không lo phần này cho bạn. Bạn nên:
+
+Index các cột hay tìm kiếm (WHERE, JOIN)
+
+Dùng Explain plan trong DB để kiểm tra hiệu suất
+
+
+✅ 8. Truy vấn native (nếu cần tối ưu sâu)
+Khi JPQL không đủ hiệu quả hoặc muốn dùng stored procedure, index hint, view, v.v.
+
+    @Query(value = "SELECT * FROM products WHERE price > ?", nativeQuery = true)
+    List<Product> findExpensive(double price);
+
+
+✅ 9. Sử dụng @BatchSize cho liên kết LAZY
+Hibernate sẽ gom nhiều truy vấn lazy vào 1 lần:
+
+    @BatchSize(size = 10)
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "user")
+    private List<Order> orders;
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+
+Data Binding trong Spring MVC
+
+Spring MVC sẽ tự động ánh xạ (bind) dữ liệu từ các trường input trong form HTML vào thuộc tính của object Java (Model object) dựa trên tên (name) của các trường input và cấu trúc object.
+
+✅ Cách hoạt động cơ bản:
+1. Form HTML gửi dữ liệu (qua GET hoặc POST)
+
+2. Spring MVC dùng @ModelAttribute (hoặc tự động) để tạo và populate object từ các trường có name=...
+
+3. Các giá trị input, select, textarea,... được gán vào các thuộc tính tương ứng của object theo tên name
+
+📦 Ví dụ đơn giản:
+✅ 1. Java model:
+    public class Product {
+        private String productName;
+        private float price;
+        private Category catalog;
+    }
+    public class Category {
+        private String categoryId;
+        private String categoryName;
+    }
+
+ ✅ 2. Form HTML:
+ 
+    <form action="/productController/createProduct" method="post">
+    <input type="text" name="productName" />
+    <input type="text" name="price" />
+    <select name="catalog.categoryId">
+        <option value="C01">Coffee</option>
+        <option value="C02">Tea</option>
+    </select>
+    <button type="submit">Create</button>
+    </form>
+
+
+✅ 3. Controller:
+    @PostMapping("/createProduct")
+    public String createProduct(@ModelAttribute Product product) {
+        // Spring sẽ tự động bind các field từ form vào object product
+        productService.save(product); 
+        return "redirect:/productList";
+    }
+
+🔁 Ngược lại – Binding ngược từ object ra form (JSP):
+
+    <input type="text" name="productName" value="${product.productName}" />
+        <select name="catalog.categoryId">
+            <c:forEach items="${categoryList}" var="cat">
+                <option value="${cat.categoryId}" 
+                <c:if test="${product.catalog.categoryId == cat.categoryId}">selected</c:if>>
+                ${cat.categoryName}
+                </option>
+            </c:forEach>
+        </select>
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+
+Tạo form HTML với Spring Form Tag Library
+
+✅ Bước 1: Cấu hình JSP hỗ trợ Spring Form<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+
+✅ Bước 2: Model Java (Ví dụ: Product)
+public class Product {
+    private String productName;
+    private float price;
+    private Category catalog;
+
+    // getters & setters
+}
+
+public class Category {
+    private String categoryId;
+    private String categoryName;
+
+    // getters & setters
+}
+
+✅ Bước 3: Controller
+
+@Controller
+@RequestMapping("/productController")
+public class ProductController {
+
+    @GetMapping("/initCreate")
+    public String initCreate(Model model) {
+        model.addAttribute("product", new Product());
+        model.addAttribute("categoryList", categoryService.findAll());
+        return "productForm";
+    }
+
+    @PostMapping("/createProduct")
+    public String createProduct(@ModelAttribute("product") Product product) {
+        product.setProductId(UUID.randomUUID().toString().substring(0, 5));
+        productService.saveProduct(product);
+        return "redirect:/productController/productList";
+    }
+}
+
+
+✅ Bước 4: JSP dùng form: tag (productForm.jsp)
+
+<%@ taglib uri="http://www.springframework.org/tags/form" prefix="form" %>
+
+<h2>Create Product</h2>
+
+<form:form modelAttribute="product" action="${pageContext.request.contextPath}/productController/createProduct" method="post">
+    <label>Product Name:</label>
+    <form:input path="productName" /><br/>
+
+    <label>Price:</label>
+    <form:input path="price" /><br/>
+
+    <label>Category:</label>
+    <form:select path="catalog.categoryId">
+        <form:options items="${categoryList}" itemValue="categoryId" itemLabel="categoryName"/>
+    </form:select><br/>
+
+    <input type="submit" value="Save"/>
+</form:form>
+
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅
+Bean Validation
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+
+✅ 1. Bean Validation là gì?
+Bean Validation là một chuẩn (JSR-303 và JSR-380) dùng để kiểm tra ràng buộc (validation) trên các thuộc tính của đối tượng Java.
+
+✅ 2. Một số Annotation thường dùng
+
+ Annotation	    Ý nghĩa
+@NotNull	    Không được null
+@NotBlank	    Không rỗng (áp dụng với String)
+@Size(min, max)	Độ dài chuỗi
+@Min, @Max	    Giá trị nhỏ/lớn nhất
+@Email	        Đúng định dạng email
+@Pattern	    Kiểm tra theo Regex
+@Past/@Future   Phải là ngày trong quá khứ / ngày trong tương lai
+
+    
+✅3. Ví dụ đơn giản
+Java Bean (DTO hoặc Form)
+
+#Java Bean
+
+    public class UserDTO {
+        @NotBlank(message = "tên không được để trống")
+        private String name;
+
+        @Email(message = "Email không hợp lệ")
+        private String email;
+
+        @Min(value = 18, message = "giá trị phải lớn hơn 18")
+        private int age;
+
+        //getter, setter
+    }
+
+#Controller
+        @PostMapping("/register")
+        public String register(
+                @Valid @ModelAttribute("user")UserDTO user,
+                BindingResult result,
+                Model model) {
+            if (result.hasErrors()) {
+                return "registerForm"; // trả lại trang form với lỗi
+            }
+            //xư lý lưu user
+            userService.save(user);
+           return "redirect:/getAll";
+        }
+
+Giải thích:
+@Valid kích hoạt validation
+BindingResult chứa các lỗi nếu có
+Nếu có lỗi: result.hasErrors() == true, ta render lại form cùng với thông báo lỗi
+ 
+
+ 
+
+🌱Một số lưu ý thực tế
+❗ Lưu ý quan trọng: BindingResult phải đứng ngay sau @Valid (hoặc @Validated), nếu không Spring sẽ ném MethodArgumentNotValidException.
+❗ Không nên validate trong Entity, nên tách sang DTO
+❗Có thể tạo custom annotation bằng cách implements ConstraintValidator
+
+Xử lý lỗi với BindingResult trong Spring form
+
+🖼️ 1. Trong view (JSP hoặc Thymeleaf)
+<form:form modelAttribute="user" method="post">
+    <div>
+        <label>Tên người dùng:</label>
+        <form:input path="name" />
+        <form:errors path="name" cssClass="error" /> -- cssClass: nếu có lỗi sẽ kích hoạt class Css đó lên
+    </div>
+...email
+
+form:errors sẽ tự động hiển thị thông báo lỗi tương ứng với BindingResult.
+
+🛠️ 2. Ví dụ đầy đủ
+✅ DTO với annotation:
+    public class UserDTO {
+        @NotBlank(message = "Tên không được để trống")
+        private String name;
+
+        @Email(message = "Email không hợp lệ")
+        @NotBlank(message = "Email không được để trống")
+        private String email;
+
+        // getter/setter
+    }
+
+✅ Controller:
+    @GetMapping("/initCreate")
+    public String initCreate(Model model) {
+        model.addAttribute("user", new UserDTO());
+        return "userForm";
+    }
+
+    @PostMapping("/create")
+    public String createUser(@Valid @ModelAttribute("user") UserDTO user,
+                            BindingResult bindingResult,
+                            Model model) {
+        if (bindingResult.hasErrors()) {
+            return "userForm";  // quay lại form nếu lỗi
+        }
+
+        // logic xử lý nếu hợp lệ
+        userService.save(user);
+        return "redirect:/users";
+    }
+
+🧩 Khi người dùng nhập sai định dạng (vi phạm @Valid như @Email, @NotBlank, @Size, v.v):
+Spring tự động binding dữ liệu từ form → vào DTO (ví dụ UserDTO).
+
+Nếu có lỗi:
+
+Spring vẫn giữ lại toàn bộ dữ liệu người dùng vừa nhập trong userDTO.
+
+Những lỗi vi phạm sẽ được ghi vào BindingResult.
+
+Khi bạn trả về return "form":
+
+Spring sẽ đưa lại userDTO (đã có dữ liệu người dùng nhập).
+
+Và BindingResult chứa lỗi → được view sử dụng để hiển thị lỗi.
+
+
+
+
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅
+
+Custom Annotation Validator
+
+✅ Khi nào cần Custom Validator?
+Dùng khi:
+
+Annotation chuẩn như @NotBlank, @Email, @Size,... không đủ đáp ứng logic bạn muốn kiểm tra.
+
+✅Ví dụ:
+
+    Kiểm tra username không trùng với trong DB
+    Kiểm tra password phải chứa chữ hoa + số + ký tự đặc biệt
+
+📦 1. Cách tạo Custom Annotation Validator
+     🧱 Bước 1: Tạo annotation mới
+        @Documented
+        @Constraint(validatedBy = MyConstraintValidator.class)
+        @Target({ ElementType.FIELD })
+        @Retention(RetentionPolicy.RUNTIME)
+        public @interface MyCustom {
+
+            String message() default "Giá trị không hợp lệ";
+
+            Class<?>[] groups() default {};
+
+            Class<? extends Payload>[] payload() default {};
+        }
+
+ 🛠️ Bước 2: Tạo class xử lý logic kiểm tra
+
+ public class MyConstraintValidator implements ConstraintValidator<MyCustom, String> {
+
+    @Override
+    public void initialize(MyCustom constraintAnnotation) {
+        // Khởi tạo nếu cần
+    }
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        // Logic kiểm tra
+        if (value == null) return false;
+        return value.startsWith("ABC"); // Ví dụ: chỉ cho phép bắt đầu bằng "ABC"
+    }
+}
+
+
+📥 2. Dùng trong DTO như annotation bình thường
+
+    public class UserDTO {
+        @MyCustom(message = "Tên phải bắt đầu bằng ABC")
+        private String name;
+
+        // getter, setter
+    }
+
+
+🎯 Ví dụ thực tế hơn: @ValidPassword
+✅ 1. Annotation:
+
+    @Documented
+    @Constraint(validatedBy = PasswordValidator.class)
+    @Target({ ElementType.FIELD })
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface ValidPassword {
+        String message() default "Mật khẩu không hợp lệ";
+        Class<?>[] groups() default {};
+        Class<? extends Payload>[] payload() default {};
+    }
+
+✅ 2. Validator logic:
+
+    public class PasswordValidator implements ConstraintValidator<ValidPassword, String> {
+    private static final String PASSWORD_PATTERN =
+            "^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$";
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        return value != null && value.matches(PASSWORD_PATTERN);
+    }
+}
+
+
+✅ 3. Dùng trong DTO:
+    public class UserDTO {
+        @ValidPassword(message = "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt")
+        private String password;
+    }
+
+
+TRƯỜNG HỢP PHẢI DÙNG CUSTOMANOTATION
+
+🔥Ngày sinh → Tính tuổi → Kiểm tra ≥ 18
+→ Trường hợp này:
+    Bạn không nhập age mà nhập birthday (LocalDate)
+    Phải tính tuổi từ ngày sinh → @Min không dùng được
+
+📦 1. Tạo Annotation @ValidAge
+    @Documented
+    @Constraint(validatedBy = ValidAgeValidator.class)
+    @Target({ ElementType.FIELD })
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface ValidAge {
+        String message() default "Tuổi phải từ {min} trở lên";
+
+        int min() default 18;
+
+        Class<?>[] groups() default {};
+
+        Class<? extends Payload>[] payload() default {};
+    }
+
+⚙️ 2. Viết ValidAgeValidator
+    public class ValidAgeValidator implements ConstraintValidator<ValidAge, LocalDate> {
+
+        private int minAge;
+
+        @Override
+        public void initialize(ValidAge constraintAnnotation) {
+            this.minAge = constraintAnnotation.min();
+        }
+
+        @Override
+        public boolean isValid(LocalDate birthday, ConstraintValidatorContext context) {
+            if (birthday == null) return true; // để @NotNull xử lý nếu cần
+
+            LocalDate today = LocalDate.now();
+            Period age = Period.between(birthday, today);
+            return age.getYears() >= minAge;
+        }
+    }
+
+
+📘 3. Dùng trong UserDTO
+
+public class UserDTO {
+
+    @NotNull(message = "Ngày sinh không được để trống")
+    @Past(message = "Ngày sinh phải là quá khứ")
+    @ValidAge(min = 18, message = "Tuổi phải từ 18 trở lên")
+    private LocalDate birthday;
+
+    // getter, setter
+}
